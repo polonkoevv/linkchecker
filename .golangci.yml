@@ -1,0 +1,58 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck           
+    - gosimple           
+    - govet              
+    - ineffassign        
+    - staticcheck        
+    - typecheck          
+    - unused             
+  
+    - gofmt              
+    - gocyclo            
+    - gocritic           
+    - revive             
+  
+    - goimports          
+  
+    - bodyclose          
+    - contextcheck       
+  
+    - gosec              
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  goimports:
+    local-prefixes: github.com/yourusername/your-project
+  revive:
+    rules:
+      - name: early-return
+      - name: unused-parameter
+      - name: errorf
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+    - path: internal/storage/.*\.go
+      linters:
+        - gosec
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+severity:
+  default: error
