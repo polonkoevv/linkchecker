@@ -1,0 +1,8 @@
+.idea
+.zed
+
+
+.env
+go.sum
+
+logs/
