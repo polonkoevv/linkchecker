@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"sync"
@@ -42,17 +43,20 @@ func (s *Storage) InsertMany(links []models.Link) (int, error) {
 }
 
 // GetByNums returns stored link groups for the given group numbers.
+// Returns found groups and logs warnings for missing ones.
 func (s *Storage) GetByNums(linksNum []int) ([]models.Links, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	res := []models.Links{}
+	res := make([]models.Links, 0, len(linksNum))
+	missing := make([]int, 0)
 
 	for _, num := range linksNum {
 		links, ok := s.links[num]
 		if !ok {
+			missing = append(missing, num)
 			slog.Warn("requested links_num not found", slog.Int("links_num", num))
-			return nil, errors.New("invalid link number")
+			continue
 		}
 		res = append(res, models.Links{
 			LinksNum: num,
@@ -60,7 +64,24 @@ func (s *Storage) GetByNums(linksNum []int) ([]models.Links, error) {
 		})
 	}
 
-	slog.Debug("loaded links by nums", slog.Int("requested_groups", len(linksNum)), slog.Int("returned_groups", len(res)))
+	if len(missing) > 0 {
+		slog.Warn("some link groups were not found",
+			slog.Int("missing_count", len(missing)),
+			slog.Any("missing_nums", missing),
+			slog.Int("found_count", len(res)),
+		)
+	}
+
+	// If all requested groups are missing, return an error
+	if len(res) == 0 && len(missing) > 0 {
+		return nil, fmt.Errorf("none of the requested link groups were found: %v", missing)
+	}
+
+	slog.Debug("loaded links by nums",
+		slog.Int("requested_groups", len(linksNum)),
+		slog.Int("returned_groups", len(res)),
+		slog.Int("missing_groups", len(missing)),
+	)
 
 	return res, nil
 }
@@ -101,6 +122,9 @@ func (s *Storage) LoadFromFile(path string) error {
 
 	var groups []models.Links
 	if err := json.NewDecoder(file).Decode(&groups); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		return fmt.Errorf("decode storage file: %w", err)
 	}
 
@@ -142,7 +166,6 @@ func (s *Storage) SaveToFile(path string) error {
 		return fmt.Errorf("close storage file: %w", err)
 	}
 
-	// атомарная замена: tmp → основной файл
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("rename storage file: %w", err)
 	}

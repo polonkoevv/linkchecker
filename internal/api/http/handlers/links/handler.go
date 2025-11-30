@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -39,29 +40,15 @@ func New(service service, requestTimeout time.Duration) *Handler {
 }
 
 // Check handles POST /links and triggers asynchronous link status checks.
+// JSON validation is handled by middleware.
 func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
-	slog.Info("incoming request",
-		slog.String("handler", "Check"),
-		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
-		slog.String("remote_addr", r.RemoteAddr),
-	)
-
 	ctx := r.Context()
 	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
 	defer cancel()
 
-	if r.Method != http.MethodPost {
-		slog.Warn("method not allowed",
-			slog.String("handler", "Check"),
-			slog.String("method", r.Method),
-		)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var req CheckLinksRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// This should rarely happen as middleware validates JSON structure
 		slog.Warn("failed to decode request body",
 			slog.String("handler", "Check"),
 			slog.Any("error", err),
@@ -70,7 +57,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Валидация
+	// Business validation: links array cannot be empty
 	if len(req.Links) == 0 {
 		slog.Warn("validation failed: links array is empty", slog.String("handler", "Check"))
 		http.Error(w, "Links array cannot be empty", http.StatusBadRequest)
@@ -79,12 +66,12 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.Service.CheckMany(ctx, req.Links)
 	if err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			slog.Warn("check links timeout", slog.String("handler", "Check"))
 			http.Error(w, "Link check timeout", http.StatusRequestTimeout)
 			return
 		}
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			slog.Warn("request canceled by client", slog.String("handler", "Check"))
 			http.Error(w, "Request canceled", http.StatusRequestTimeout)
 			return
@@ -104,33 +91,24 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		slog.Error("failed to encode response",
+			slog.String("handler", "GetAll"),
+			slog.Any("error", err),
+		)
+	}
 }
 
 // GenerateReport handles POST /report and returns a PDF or JSON report.
+// JSON validation is handled by middleware.
 func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
-	slog.Info("incoming request",
-		slog.String("handler", "GenerateReport"),
-		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
-		slog.String("remote_addr", r.RemoteAddr),
-	)
-
 	ctx := r.Context()
 	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
 	defer cancel()
 
-	if r.Method != http.MethodPost {
-		slog.Warn("method not allowed",
-			slog.String("handler", "GenerateReport"),
-			slog.String("method", r.Method),
-		)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var req models.GenerateReportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// This should rarely happen as middleware validates JSON structure
 		slog.Warn("failed to decode request body",
 			slog.String("handler", "GenerateReport"),
 			slog.Any("error", err),
@@ -139,6 +117,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Business validation: links_num array cannot be empty
 	if len(req.LinksNum) == 0 {
 		slog.Warn("validation failed: links_num array is empty", slog.String("handler", "GenerateReport"))
 		http.Error(w, "Links_num array cannot be empty", http.StatusBadRequest)
@@ -166,10 +145,15 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 		// Возвращаем JSON с информацией об отчете
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(models.GenerateReportResponse{
+		if err := json.NewEncoder(w).Encode(models.GenerateReportResponse{
 			Message: "PDF report generated successfully",
 			Size:    pdfBuffer.Len(),
-		})
+		}); err != nil {
+			slog.Error("failed to encode response",
+				slog.String("handler", "GenerateReport"),
+				slog.Any("error", err),
+			)
+		}
 		return
 	}
 
@@ -196,34 +180,18 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 // GetAll handles GET /links and returns all stored link groups.
 func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	slog.Info("incoming request",
-		slog.String("handler", "GetAll"),
-		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
-		slog.String("remote_addr", r.RemoteAddr),
-	)
-
 	ctx := r.Context()
 	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
 	defer cancel()
 
-	if r.Method != http.MethodGet {
-		slog.Warn("method not allowed",
-			slog.String("handler", "GetAll"),
-			slog.String("method", r.Method),
-		)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	result, err := h.Service.GetAll(ctx)
 	if err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			slog.Warn("get all timeout", slog.String("handler", "GetAll"))
 			http.Error(w, "Get all timeout", http.StatusRequestTimeout)
 			return
 		}
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			slog.Warn("request canceled by client", slog.String("handler", "GetAll"))
 			http.Error(w, "Request canceled", http.StatusRequestTimeout)
 			return
@@ -243,5 +211,10 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		slog.Error("failed to encode response",
+			slog.String("handler", "GetAll"),
+			slog.Any("error", err),
+		)
+	}
 }
