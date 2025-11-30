@@ -200,7 +200,6 @@ func (g *GoFPDFGenerator) addDetailedLinks(pdf *gofpdf.Fpdf, links models.Links)
 	pdf.CellFormat(widths[1], 8, "Status", "1", 0, "C", true, 0, "")
 	pdf.CellFormat(widths[2], 8, "Duration", "1", 0, "C", true, 0, "")
 	pdf.CellFormat(widths[3], 8, "Checked At", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(widths[4], 8, "Error", "1", 0, "C", true, 0, "")
 	pdf.Ln(8)
 
 	// Данные таблицы
@@ -231,13 +230,6 @@ func (g *GoFPDFGenerator) addDetailedLinks(pdf *gofpdf.Fpdf, links models.Links)
 		checkedTime := link.CheckedAt.Format("15:04:05 02.01.2006")
 		pdf.CellFormat(widths[3], 6, checkedTime, "1", 0, "C", fill, 0, "")
 
-		// Error
-		errorMsg := ""
-		if link.Error != nil {
-			errorMsg = truncateString(link.Error.Error(), 40)
-		}
-		pdf.CellFormat(widths[4], 6, errorMsg, "1", 0, "L", fill, 0, "")
-
 		pdf.Ln(6)
 		fill = !fill
 
@@ -251,7 +243,6 @@ func (g *GoFPDFGenerator) addDetailedLinks(pdf *gofpdf.Fpdf, links models.Links)
 			pdf.CellFormat(widths[1], 8, "Status", "1", 0, "C", true, 0, "")
 			pdf.CellFormat(widths[2], 8, "Duration", "1", 0, "C", true, 0, "")
 			pdf.CellFormat(widths[3], 8, "Checked At", "1", 0, "C", true, 0, "")
-			pdf.CellFormat(widths[4], 8, "Error", "1", 0, "C", true, 0, "")
 			pdf.Ln(8)
 			pdf.SetFont(familyStr, "", 8)
 		}

@@ -17,7 +17,6 @@ type Links struct {
 type Link struct {
 	URL       string        `json:"url"`
 	Status    LinkStatus    `json:"status"`
-	Error     error         `json:"error"`
 	Duration  time.Duration `json:"duration"`
 	CheckedAt time.Time     `json:"checked_at"`
 }

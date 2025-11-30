@@ -1,8 +1,11 @@
 package inmemory
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/polonkoevv/linkchecker/internal/models"
@@ -74,4 +77,68 @@ func (s *Storage) GetAll() ([]models.Links, error) {
 	slog.Debug("loaded all links groups", slog.Int("groups_count", len(res)))
 
 	return res, nil
+}
+
+func (s *Storage) LoadFromFile(path string) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// файла нет — это не ошибка, просто нечего грузить
+			return nil
+		}
+		return fmt.Errorf("open storage file: %w", err)
+	}
+	defer file.Close()
+
+	var groups []models.Links
+	if err := json.NewDecoder(file).Decode(&groups); err != nil {
+		return fmt.Errorf("decode storage file: %w", err)
+	}
+
+	s.links = make(map[int][]models.Link, len(groups))
+	for _, g := range groups {
+		s.links[g.LinksNum] = g.Links
+	}
+
+	return nil
+}
+
+func (s *Storage) SaveToFile(path string) error {
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
+
+	groups := make([]models.Links, 0, len(s.links))
+	for num, links := range s.links {
+		groups = append(groups, models.Links{
+			LinksNum: num,
+			Links:    links,
+		})
+	}
+
+	tmpPath := path + ".tmp"
+
+	file, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("create storage file: %w", err)
+	}
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+
+	if err := enc.Encode(groups); err != nil {
+		file.Close()
+		return fmt.Errorf("encode storage file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close storage file: %w", err)
+	}
+
+	// атомарная замена: tmp → основной файл
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("rename storage file: %w", err)
+	}
+
+	return nil
 }

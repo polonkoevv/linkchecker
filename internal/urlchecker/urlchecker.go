@@ -44,7 +44,6 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 
@@ -60,7 +59,6 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 
@@ -79,7 +77,6 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 	defer resp.Body.Close()
@@ -122,7 +119,6 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 
@@ -137,7 +133,6 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 
@@ -155,7 +150,6 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 			Status:    models.LinkStatusNotAvailable,
 			CheckedAt: start,
 			Duration:  time.Since(start),
-			Error:     err,
 		}
 	}
 	defer resp.Body.Close()
