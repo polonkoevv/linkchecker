@@ -134,7 +134,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, хочет ли клиент JSON ответ или PDF
+	// Checking if client wants JSON or PDF response
 	acceptHeader := r.Header.Get("Accept")
 	if strings.Contains(acceptHeader, "application/json") {
 		slog.Debug("returning JSON report meta",
@@ -143,7 +143,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 			slog.Int("size_bytes", pdfBuffer.Len()),
 		)
 
-		// Возвращаем JSON с информацией об отчете
+		// Returning JSON with report information
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(models.GenerateReportResponse{
 			Message: "PDF report generated successfully",
@@ -157,7 +157,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// По умолчанию возвращаем PDF
+	// Returning PDF report by default
 	slog.Debug("returning PDF report",
 		slog.String("handler", "GenerateReport"),
 		slog.Int("links_num_count", len(req.LinksNum)),

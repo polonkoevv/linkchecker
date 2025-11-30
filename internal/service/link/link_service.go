@@ -17,11 +17,19 @@ type linkRepository interface {
 	GetAll() ([]models.Links, error)
 }
 
+type urlChecker interface {
+	CheckURLWithContext(ctx context.Context, rawURL string) models.Link
+}
+
+type pdfGenerator interface {
+	GenerateMultipleReports(linksSlice []models.Links) (*bytes.Buffer, error)
+}
+
 // LinkService contains business logic for checking links and generating reports.
 type Service struct {
 	repository   linkRepository
-	urlChecker   *urlchecker.Checker
-	pdfGenerator *pdfgenerator.GoFPDFGenerator
+	urlChecker   urlChecker
+	pdfGenerator pdfGenerator
 
 	workerCount int
 }
@@ -42,7 +50,7 @@ func New(repo linkRepository, workerCount int) *Service {
 	}
 }
 
-// deduplicateLinks removes duplicate links from the slice.
+// duplicateLinks removes duplicate links from the slice.
 func deduplicateLinks(links []string) []string {
 	seen := make(map[string]struct{}, len(links))
 	unique := make([]string, 0, len(links))

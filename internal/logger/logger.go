@@ -38,7 +38,7 @@ func SetupLogger(logFile, logLevel string) (*slog.Logger, func() error, error) {
 
 	multiWriter := io.MultiWriter(writers...)
 
-	// Настраиваем уровень логирования
+	// Setting log level
 	var level slog.Level
 	switch logLevel {
 	case "debug":

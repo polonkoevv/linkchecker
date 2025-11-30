@@ -31,6 +31,10 @@ func (s *Storage) InsertMany(links []models.Link) (int, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
+	if len(links) == 0 {
+		return 0, errors.New("empty links slice")
+	}
+
 	num := len(s.links) + 1
 	s.links[num] = links
 
@@ -72,7 +76,6 @@ func (s *Storage) GetByNums(linksNum []int) ([]models.Links, error) {
 		)
 	}
 
-	// If all requested groups are missing, return an error
 	if len(res) == 0 && len(missing) > 0 {
 		return nil, fmt.Errorf("none of the requested link groups were found: %v", missing)
 	}
@@ -113,7 +116,6 @@ func (s *Storage) LoadFromFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Missing file is not an error, there is simply nothing to load yet
 			return nil
 		}
 		return fmt.Errorf("open storage file: %w", err)
@@ -136,7 +138,7 @@ func (s *Storage) LoadFromFile(path string) error {
 	return nil
 }
 
-// SaveToFile writes current storage state to a JSON file atomically.
+// SaveToFile writes current storage state to a JSON file.
 func (s *Storage) SaveToFile(path string) error {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
@@ -164,10 +166,6 @@ func (s *Storage) SaveToFile(path string) error {
 	}
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("close storage file: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("rename storage file: %w", err)
 	}
 
 	return nil

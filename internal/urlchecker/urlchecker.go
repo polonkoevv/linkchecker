@@ -28,7 +28,7 @@ func NewChecker() *Checker {
 func (c *Checker) CheckURL(rawURL string) models.Link {
 	start := time.Now()
 
-	// Нормализуем URL
+	// Normalizing URL
 	normalizedURL, err := c.normalizeURL(rawURL)
 	if err != nil {
 		slog.Warn("failed to normalize URL",
@@ -43,7 +43,7 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 		}
 	}
 
-	// Создаем запрос с правильными заголовками
+	// Creating request with correct headers
 	req, err := http.NewRequest("HEAD", normalizedURL, http.NoBody)
 	if err != nil {
 		slog.Error("failed to create HTTP request",
@@ -61,7 +61,6 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	req.Header.Set("User-Agent", "WebStatusChecker/1.0")
 	req.Header.Set("Accept", "*/*")
 
-	// Выполняем запрос
 	resp, err := c.client.Do(req)
 	if err != nil {
 		slog.Debug("HTTP request failed",
@@ -79,7 +78,7 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 
 	duration := time.Since(start)
 
-	// Считаем доступным если статус 2xx или 3xx
+	// Considering available if status is 2xx or 3xx
 	status := models.LinkStatusNotAvailable
 	if resp.StatusCode < 400 {
 		status = models.LinkStatusAvailable
@@ -100,7 +99,7 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	}
 }
 
-// CheckURLWithContext проверяет ссылку с контекстом
+// CheckURLWithContext checks URL with context
 func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models.Link {
 	start := time.Now()
 
