@@ -42,7 +42,18 @@ func New(repo linkRepository, timeout time.Duration, pdfGenerator *pdfgenerator.
 }
 
 func (s *LinkService) CheckMany(ctx context.Context, links []string) (models.LinksResponse, error) {
-	linksLen := len(links)
+	seen := make(map[string]struct{}, len(links))
+	unique := make([]string, 0, len(links))
+
+	for _, raw := range links {
+		if _, ok := seen[raw]; ok {
+			continue
+		}
+		seen[raw] = struct{}{}
+		unique = append(unique, raw)
+	}
+
+	linksLen := len(unique)
 	checkedLinks := make([]models.Link, 0, linksLen)
 
 	slog.Info("checking links with worker pool", slog.Int("count", linksLen))
@@ -91,7 +102,7 @@ func (s *LinkService) CheckMany(ctx context.Context, links []string) (models.Lin
 
 	go func() {
 		defer close(jobs)
-		for _, raw := range links {
+		for _, raw := range unique {
 			select {
 			case <-ctx.Done():
 				slog.Warn("producer stopped due to context done")
