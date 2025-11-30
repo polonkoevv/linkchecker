@@ -5,7 +5,6 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/polonkoevv/linkchecker/internal/models"
 	"github.com/polonkoevv/linkchecker/internal/pdfgenerator"
@@ -18,6 +17,7 @@ type linkRepository interface {
 	GetAll() ([]models.Links, error)
 }
 
+// LinkService contains business logic for checking links and generating reports.
 type LinkService struct {
 	repository   linkRepository
 	urlChecker   *urlchecker.Checker
@@ -28,19 +28,21 @@ type LinkService struct {
 
 const defaultWorkerCount = 4
 
-func New(repo linkRepository, timeout time.Duration, pdfGenerator *pdfgenerator.GoFPDFGenerator, workerCount int) *LinkService {
+// New creates a LinkService with the given repository, PDF generator and worker pool size.
+func New(repo linkRepository, workerCount int) *LinkService {
 	if workerCount <= 0 {
 		workerCount = defaultWorkerCount
 	}
 
 	return &LinkService{
 		repository:   repo,
-		urlChecker:   urlchecker.NewChecker(timeout),
-		pdfGenerator: pdfGenerator,
+		urlChecker:   urlchecker.NewChecker(),
+		pdfGenerator: pdfgenerator.NewGoFPDFGenerator(),
 		workerCount:  workerCount,
 	}
 }
 
+// CheckMany validates and checks the given links concurrently using a worker pool.
 func (s *LinkService) CheckMany(ctx context.Context, links []string) (models.LinksResponse, error) {
 	seen := make(map[string]struct{}, len(links))
 	unique := make([]string, 0, len(links))
@@ -153,6 +155,7 @@ func (s *LinkService) CheckMany(ctx context.Context, links []string) (models.Lin
 	}
 }
 
+// GenerateReport builds a PDF report for the specified link group numbers.
 func (s *LinkService) GenerateReport(ctx context.Context, linksNum []int) (*bytes.Buffer, error) {
 	slog.Info("generating report for links groups", slog.Int("groups", len(linksNum)))
 
@@ -175,6 +178,7 @@ func (s *LinkService) GenerateReport(ctx context.Context, linksNum []int) (*byte
 	return report, nil
 }
 
+// GetAll returns all stored link groups from the repository.
 func (s *LinkService) GetAll(ctx context.Context) ([]models.Links, error) {
 	slog.Info("fetching all links groups")
 

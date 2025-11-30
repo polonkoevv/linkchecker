@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 )
 
+// SetupLogger configures slog logger writing to file and stdout based on level.
 func SetupLogger(logFile string, logLevel string) (*slog.Logger, func() error, error) {
 	if logFile != "" {
 		logDir := filepath.Dir(logFile)

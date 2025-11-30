@@ -10,6 +10,7 @@ import (
 	"github.com/polonkoevv/linkchecker/internal/models"
 )
 
+// GoFPDFGenerator generates PDF reports using gofpdf
 type GoFPDFGenerator struct {
 }
 
@@ -34,10 +35,12 @@ const familyStr string = "Arial"
 const styleStr string = "B"
 const size float64 = 20
 
+// NewGoFPDFGenerator creates a new GoFPDFGenerator instance.
 func NewGoFPDFGenerator() *GoFPDFGenerator {
 	return &GoFPDFGenerator{}
 }
 
+// GenerateReport builds a single-group PDF report for the given links.
 func (g *GoFPDFGenerator) GenerateReport(links models.Links) (*bytes.Buffer, error) {
 	slog.Info("generating single PDF report",
 		slog.Int("links_num", links.LinksNum),
@@ -75,25 +78,21 @@ func (g *GoFPDFGenerator) GenerateReport(links models.Links) (*bytes.Buffer, err
 	return &buf, nil
 }
 
+// GenerateMultipleReports builds a multi-page PDF for several link groups.
 func (g *GoFPDFGenerator) GenerateMultipleReports(linksSlice []models.Links) (*bytes.Buffer, error) {
 	slog.Info("generating multi-group PDF report", slog.Int("groups", len(linksSlice)))
 
 	pdf := gofpdf.New(orientationStr, unitStr, sizeStr, fontDirStr)
 
 	for _, links := range linksSlice {
-		// Добавляем страницу для каждой группы ссылок
 		pdf.AddPage()
 
-		// Добавляем заголовок с номером группы
 		g.addHeaderWithGroup(pdf, links.LinksNum)
 
-		// Рассчитываем статистику для текущей группы
 		stats := g.calculateStatistic(links)
 
-		// Добавляем статистику
 		g.addStatistics(pdf, stats)
 
-		// Добавляем детальную информацию по ссылкам
 		g.addDetailedLinks(pdf, links)
 	}
 
@@ -144,16 +143,13 @@ func (g *GoFPDFGenerator) calculateStatistic(links models.Links) *pdfStatistic {
 }
 
 func (g *GoFPDFGenerator) addStatistics(pdf *gofpdf.Fpdf, stats *pdfStatistic) {
-	// Заголовок
 	pdf.SetFont(familyStr, styleStr, 16)
 	pdf.CellFormat(0, 10, "STATISTICS SUMMARY", "", 0, "L", false, 0, "")
 	pdf.Ln(12)
 
-	// Создаем таблицу
 	pdf.SetFont(familyStr, styleStr, 12)
 	pdf.SetFillColor(240, 240, 240)
 
-	// Заголовки таблицы
 	pdf.CellFormat(80, 8, "Metric", "1", 0, "C", true, 0, "")
 	pdf.CellFormat(50, 8, "Count", "1", 0, "C", true, 0, "")
 	pdf.CellFormat(60, 8, "Average Time", "1", 0, "C", true, 0, "")
@@ -162,19 +158,16 @@ func (g *GoFPDFGenerator) addStatistics(pdf *gofpdf.Fpdf, stats *pdfStatistic) {
 	pdf.SetFont(familyStr, "", 12)
 	pdf.SetFillColor(255, 255, 255)
 
-	// Доступные ссылки
 	pdf.CellFormat(80, 8, "Available Links", "1", 0, "L", true, 0, "")
 	pdf.CellFormat(50, 8, fmt.Sprintf("%d", stats.available), "1", 0, "C", true, 0, "")
 	pdf.CellFormat(60, 8, stats.averageAvailableSpeed.Round(time.Millisecond).String(), "1", 0, "C", true, 0, "")
 	pdf.Ln(8)
 
-	// Недоступные ссылки
 	pdf.CellFormat(80, 8, "Not Available Links", "1", 0, "L", true, 0, "")
 	pdf.CellFormat(50, 8, fmt.Sprintf("%d", stats.notAvailable), "1", 0, "C", true, 0, "")
 	pdf.CellFormat(60, 8, stats.averageNotAvailableSpeed.Round(time.Millisecond).String(), "1", 0, "C", true, 0, "")
 	pdf.Ln(8)
 
-	// Всего
 	pdf.SetFont(familyStr, styleStr, 12)
 	pdf.CellFormat(80, 8, "TOTAL", "1", 0, "L", true, 0, "")
 	pdf.CellFormat(50, 8, fmt.Sprintf("%d", stats.total), "1", 0, "C", true, 0, "")
@@ -183,17 +176,14 @@ func (g *GoFPDFGenerator) addStatistics(pdf *gofpdf.Fpdf, stats *pdfStatistic) {
 }
 
 func (g *GoFPDFGenerator) addDetailedLinks(pdf *gofpdf.Fpdf, links models.Links) {
-	// Заголовок раздела
 	pdf.SetFont(familyStr, styleStr, 16)
 	pdf.SetTextColor(0, 0, 0)
 	pdf.CellFormat(0, 10, "DETAILED LINK REPORT", "", 0, "L", false, 0, "")
 	pdf.Ln(12)
 
-	// Создаем таблицу
 	pdf.SetFont(familyStr, styleStr, 10)
 	pdf.SetFillColor(200, 200, 200)
 
-	// Заголовки таблицы
 	widths := []float64{60, 25, 25, 30, 40}
 
 	pdf.CellFormat(widths[0], 8, "URL", "1", 0, "C", true, 0, "")
@@ -202,41 +192,33 @@ func (g *GoFPDFGenerator) addDetailedLinks(pdf *gofpdf.Fpdf, links models.Links)
 	pdf.CellFormat(widths[3], 8, "Checked At", "1", 0, "C", true, 0, "")
 	pdf.Ln(8)
 
-	// Данные таблицы
 	pdf.SetFont(familyStr, "", 8)
 	fill := false
 
 	for _, link := range links.Links {
-		// Чередуем цвет фона для читаемости
 		if fill {
 			pdf.SetFillColor(240, 240, 240)
 		} else {
 			pdf.SetFillColor(255, 255, 255)
 		}
 
-		// URL (с переносом строк)
 		pdf.CellFormat(widths[0], 6, truncateString(link.URL, 50), "1", 0, "L", fill, 0, "")
 
-		// Status с цветом
 		statusColor := getStatusColor(link.Status)
 		pdf.SetTextColor(statusColor[0], statusColor[1], statusColor[2])
 		pdf.CellFormat(widths[1], 6, string(link.Status), "1", 0, "C", fill, 0, "")
 		pdf.SetTextColor(0, 0, 0)
 
-		// Duration
 		pdf.CellFormat(widths[2], 6, link.Duration.Round(time.Millisecond).String(), "1", 0, "C", fill, 0, "")
 
-		// Checked At
 		checkedTime := link.CheckedAt.Format("15:04:05 02.01.2006")
 		pdf.CellFormat(widths[3], 6, checkedTime, "1", 0, "C", fill, 0, "")
 
 		pdf.Ln(6)
 		fill = !fill
 
-		// Проверяем, не нужно ли добавить новую страницу
 		if pdf.GetY() > 260 {
 			pdf.AddPage()
-			// Повторяем заголовки на новой странице
 			pdf.SetFont(familyStr, styleStr, 10)
 			pdf.SetFillColor(200, 200, 200)
 			pdf.CellFormat(widths[0], 8, "URL", "1", 0, "C", true, 0, "")
@@ -259,10 +241,10 @@ func truncateString(s string, maxLen int) string {
 func getStatusColor(status models.LinkStatus) [3]int {
 	switch status {
 	case models.LinkStatusAvailable:
-		return [3]int{0, 128, 0} // Зеленый
+		return [3]int{0, 128, 0} // Green
 	case models.LinkStatusNotAvailable:
-		return [3]int{255, 0, 0} // Красный
+		return [3]int{255, 0, 0} // Red
 	default:
-		return [3]int{0, 0, 0} // Черный
+		return [3]int{0, 0, 0} // Black
 	}
 }

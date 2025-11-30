@@ -12,23 +12,19 @@ import (
 	"github.com/polonkoevv/linkchecker/internal/models"
 )
 
+// Checker performs HTTP HEAD requests to determine link availability.
 type Checker struct {
-	client  *http.Client
-	timeout time.Duration
+	client *http.Client
 }
 
-func NewChecker(timeout time.Duration) *Checker {
+// NewChecker creates a new Checker with a default HTTP client.
+func NewChecker() *Checker {
 	return &Checker{
-		client: &http.Client{
-			Timeout: timeout,
-			// CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// 	return http.ErrUseLastResponse
-			// },
-		},
-		timeout: timeout,
+		client: &http.Client{},
 	}
 }
 
+// CheckURL checks the given URL without external context control.
 func (c *Checker) CheckURL(rawURL string) models.Link {
 	start := time.Now()
 

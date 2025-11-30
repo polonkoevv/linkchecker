@@ -13,13 +13,9 @@ import (
 	"github.com/polonkoevv/linkchecker/internal/models"
 )
 
+// CheckLinksRequest represents a request payload for checking multiple links.
 type CheckLinksRequest struct {
 	Links []string `json:"links"`
-}
-
-type CheckLinksResponse struct {
-	Links    map[string]string `json:"links"`
-	LinksNum int               `json:"links_num"`
 }
 
 type service interface {
@@ -28,16 +24,21 @@ type service interface {
 	GetAll(ctx context.Context) ([]models.Links, error)
 }
 
+// Handler provides HTTP handlers for link checking and reporting.
 type Handler struct {
-	service service
+	Service        service
+	RequestTimeout time.Duration
 }
 
-func New(service service) *Handler {
+// New constructs a new Handler with the given service and per-request timeout.
+func New(service service, requestTimeout time.Duration) *Handler {
 	return &Handler{
-		service: service,
+		Service:        service,
+		RequestTimeout: requestTimeout,
 	}
 }
 
+// Check handles POST /links and triggers asynchronous link status checks.
 func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	slog.Info("incoming request",
 		slog.String("handler", "Check"),
@@ -47,7 +48,8 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	)
 
 	ctx := r.Context()
-	ctx, _ = context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
+	defer cancel()
 
 	if r.Method != http.MethodPost {
 		slog.Warn("method not allowed",
@@ -75,7 +77,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.CheckMany(ctx, req.Links)
+	result, err := h.Service.CheckMany(ctx, req.Links)
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			slog.Warn("check links timeout", slog.String("handler", "Check"))
@@ -105,6 +107,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+// GenerateReport handles POST /report and returns a PDF or JSON report.
 func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 	slog.Info("incoming request",
 		slog.String("handler", "GenerateReport"),
@@ -114,6 +117,8 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 	)
 
 	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
+	defer cancel()
 
 	if r.Method != http.MethodPost {
 		slog.Warn("method not allowed",
@@ -140,7 +145,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pdfBuffer, err := h.service.GenerateReport(ctx, req.LinksNum)
+	pdfBuffer, err := h.Service.GenerateReport(ctx, req.LinksNum)
 	if err != nil {
 		slog.Error("failed to generate report",
 			slog.String("handler", "GenerateReport"),
@@ -189,6 +194,7 @@ func (h *Handler) GenerateReport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAll handles GET /links and returns all stored link groups.
 func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	slog.Info("incoming request",
 		slog.String("handler", "GetAll"),
@@ -198,7 +204,8 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	)
 
 	ctx := r.Context()
-	ctx, _ = context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, h.RequestTimeout)
+	defer cancel()
 
 	if r.Method != http.MethodGet {
 		slog.Warn("method not allowed",
@@ -209,7 +216,7 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.GetAll(ctx)
+	result, err := h.Service.GetAll(ctx)
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			slog.Warn("get all timeout", slog.String("handler", "GetAll"))

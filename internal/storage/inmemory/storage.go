@@ -11,11 +11,13 @@ import (
 	"github.com/polonkoevv/linkchecker/internal/models"
 )
 
+// Storage implements an in-memory link repository with optional JSON persistence.
 type Storage struct {
 	links map[int][]models.Link
 	mtx   sync.RWMutex
 }
 
+// New creates an empty in-memory Storage instance.
 func New() *Storage {
 	return &Storage{
 		links: make(map[int][]models.Link),
@@ -23,6 +25,7 @@ func New() *Storage {
 	}
 }
 
+// InsertMany stores a batch of links and returns its group number.
 func (s *Storage) InsertMany(links []models.Link) (int, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -38,6 +41,7 @@ func (s *Storage) InsertMany(links []models.Link) (int, error) {
 	return num, nil
 }
 
+// GetByNums returns stored link groups for the given group numbers.
 func (s *Storage) GetByNums(linksNum []int) ([]models.Links, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
@@ -61,6 +65,7 @@ func (s *Storage) GetByNums(linksNum []int) ([]models.Links, error) {
 	return res, nil
 }
 
+// GetAll returns all stored link groups.
 func (s *Storage) GetAll() ([]models.Links, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
@@ -79,6 +84,7 @@ func (s *Storage) GetAll() ([]models.Links, error) {
 	return res, nil
 }
 
+// LoadFromFile populates storage state from a JSON file if it exists.
 func (s *Storage) LoadFromFile(path string) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -86,7 +92,7 @@ func (s *Storage) LoadFromFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// файла нет — это не ошибка, просто нечего грузить
+			// Missing file is not an error, there is simply nothing to load yet
 			return nil
 		}
 		return fmt.Errorf("open storage file: %w", err)
@@ -106,6 +112,7 @@ func (s *Storage) LoadFromFile(path string) error {
 	return nil
 }
 
+// SaveToFile writes current storage state to a JSON file atomically.
 func (s *Storage) SaveToFile(path string) error {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
