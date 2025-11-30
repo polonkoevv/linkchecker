@@ -8,7 +8,7 @@ import (
 )
 
 // SetupLogger configures slog logger writing to file and stdout based on level.
-func SetupLogger(logFile string, logLevel string) (*slog.Logger, func() error, error) {
+func SetupLogger(logFile, logLevel string) (*slog.Logger, func() error, error) {
 	if logFile != "" {
 		logDir := filepath.Dir(logFile)
 		if err := os.MkdirAll(logDir, 0755); err != nil {

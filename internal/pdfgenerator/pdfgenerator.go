@@ -133,10 +133,10 @@ func (g *GoFPDFGenerator) calculateStatistic(links models.Links) *pdfStatistic {
 	}
 
 	if res.available > 0 {
-		res.averageAvailableSpeed = res.averageAvailableSpeed / time.Duration(res.available)
+		res.averageAvailableSpeed /= time.Duration(res.available)
 	}
 	if res.notAvailable > 0 {
-		res.averageNotAvailableSpeed = res.averageNotAvailableSpeed / time.Duration(res.notAvailable)
+		res.averageNotAvailableSpeed /= time.Duration(res.notAvailable)
 	}
 
 	return res

@@ -21,6 +21,8 @@ type App struct {
 	server  *http.Server
 }
 
+const shutdownTimeout = 5 * time.Second
+
 // New constructs the application with all required dependencies.
 func New(cfg *config.Config) (*App, error) {
 	stg := inmemory.New()
@@ -68,7 +70,7 @@ func (a *App) Run(ctx context.Context) error {
 	slog.Info("shutdown signal received")
 
 	// give server some time to finish active requests
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 	defer cancel()
 
 	if err := a.server.Shutdown(shutdownCtx); err != nil {

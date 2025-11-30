@@ -22,12 +22,16 @@ func main() {
 		os.Exit(1)
 	}
 	slog.SetDefault(appLogger)
-	defer closeLogFile()
+	defer func() {
+		if err := closeLogFile(); err != nil {
+			slog.Error("failed to close log file", slog.Any("error", err))
+		}
+	}()
 
 	a, err := app.New(cfg)
 	if err != nil {
 		slog.Error("failed to initialize app", slog.Any("error", err))
-		os.Exit(1)
+		return // defer выполнится автоматически
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -35,6 +39,6 @@ func main() {
 
 	if err := a.Run(ctx); err != nil && err != http.ErrServerClosed {
 		slog.Error("app stopped with error", slog.Any("error", err))
-		os.Exit(1)
+		return // defer выполнится автоматически
 	}
 }

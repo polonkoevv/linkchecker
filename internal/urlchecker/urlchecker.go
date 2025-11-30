@@ -44,7 +44,7 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	}
 
 	// Создаем запрос с правильными заголовками
-	req, err := http.NewRequest("HEAD", normalizedURL, nil)
+	req, err := http.NewRequest("HEAD", normalizedURL, http.NoBody)
 	if err != nil {
 		slog.Error("failed to create HTTP request",
 			slog.String("url", normalizedURL),
@@ -118,7 +118,7 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "HEAD", normalizedURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "HEAD", normalizedURL, http.NoBody)
 	if err != nil {
 		slog.Error("failed to create HTTP request with context",
 			slog.String("url", normalizedURL),

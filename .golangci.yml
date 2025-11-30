@@ -1,15 +1,18 @@
 run:
   timeout: 5m
   modules-download-mode: readonly
+  tests: true
 
 output:
   format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
+  print-welcome: false
 
 linters:
   disable-all: true
   enable:
+    # Essential linters
     - errcheck           
     - gosimple           
     - govet              
@@ -17,42 +20,77 @@ linters:
     - staticcheck        
     - typecheck          
     - unused             
-  
+    
+    # Code style
     - gofmt              
+    - goimports          
+    
+    # Code complexity
     - gocyclo            
     - gocritic           
+    
+    # Code quality
     - revive             
-  
-    - goimports          
-  
     - bodyclose          
     - contextcheck       
-  
+    
+    # Security
     - gosec              
 
 linters-settings:
   gocyclo:
     min-complexity: 15
   goimports:
-    local-prefixes: github.com/yourusername/your-project
+    local-prefixes: github.com/polonkoevv/linkchecker
   revive:
     rules:
       - name: early-return
       - name: unused-parameter
       - name: errorf
+      - name: var-naming
+      - name: package-comments
+      - name: exported
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport 
+      - ifElseChain
+      - octalLiteral
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104 
 
 issues:
   exclude-rules:
+    # Exclude test files from some checks
     - path: _test\.go
       linters:
         - gocyclo
         - errcheck
+        - gosec
+    # Exclude storage layer from some security checks (file operations are expected)
     - path: internal/storage/.*\.go
       linters:
         - gosec
+    # Allow empty blocks in error handling
+    - text: "empty block"
+      linters:
+        - revive
+    # Allow unused parameters in interface implementations
+    - text: "unused parameter"
+      linters:
+        - revive
 
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-use-default-excludes: false
 
 severity:
   default: error
