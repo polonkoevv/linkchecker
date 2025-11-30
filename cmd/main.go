@@ -16,28 +16,38 @@ import (
 )
 
 func main() {
-
 	cfg := config.MustLoad()
 
 	appLogger, closeLogFile, err := logger.SetupLogger(cfg.Logger.LogPath, cfg.Logger.LevelInfo)
 	if err != nil {
-		slog.Error("Error while setting up logger", slog.Any("error", err))
+		slog.Error("error while setting up logger", slog.Any("error", err))
 		os.Exit(1)
 	}
 	slog.SetDefault(appLogger)
 	defer closeLogFile()
 
+	slog.Info("configuration loaded",
+		slog.String("host", cfg.Server.Host),
+		slog.String("port", cfg.Server.Port),
+	)
+
 	stg := inmemory.New()
+	slog.Info("in-memory storage initialized")
 
 	pdfGen := pdfgenerator.GoFPDFGenerator{}
 
 	srv := link.New(stg, 5*time.Second, &pdfGen)
+	slog.Info("link service initialized")
 
 	handler := links.New(srv)
-
 	mux := server.ConfigRoutes(handler)
 
-	server := server.NewServer(fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port), mux)
+	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
+	httpServer := server.NewServer(addr, mux)
 
-	server.ListenAndServe()
+	slog.Info("starting http server", slog.String("addr", addr))
+	if err := httpServer.ListenAndServe(); err != nil {
+		slog.Error("http server stopped with error", slog.Any("error", err))
+		os.Exit(1)
+	}
 }

@@ -3,6 +3,7 @@ package pdfgenerator
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -38,6 +39,10 @@ func NewGoFPDFGenerator() *GoFPDFGenerator {
 }
 
 func (g *GoFPDFGenerator) GenerateReport(links models.Links) (*bytes.Buffer, error) {
+	slog.Info("generating single PDF report",
+		slog.Int("links_num", links.LinksNum),
+		slog.Int("links_count", len(links.Links)),
+	)
 
 	pdf := gofpdf.New(orientationStr, unitStr, sizeStr, fontDirStr)
 	pdf.AddPage()
@@ -58,13 +63,21 @@ func (g *GoFPDFGenerator) GenerateReport(links models.Links) (*bytes.Buffer, err
 	var buf bytes.Buffer
 	err := pdf.Output(&buf)
 	if err != nil {
+		slog.Error("failed to generate single PDF report", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
+
+	slog.Debug("single PDF report generated",
+		slog.Int("links_num", links.LinksNum),
+		slog.Int("size_bytes", buf.Len()),
+	)
 
 	return &buf, nil
 }
 
 func (g *GoFPDFGenerator) GenerateMultipleReports(linksSlice []models.Links) (*bytes.Buffer, error) {
+	slog.Info("generating multi-group PDF report", slog.Int("groups", len(linksSlice)))
+
 	pdf := gofpdf.New(orientationStr, unitStr, sizeStr, fontDirStr)
 
 	for _, links := range linksSlice {
@@ -87,8 +100,14 @@ func (g *GoFPDFGenerator) GenerateMultipleReports(linksSlice []models.Links) (*b
 	var buf bytes.Buffer
 	err := pdf.Output(&buf)
 	if err != nil {
+		slog.Error("failed to generate multi-group PDF report", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
+
+	slog.Debug("multi-group PDF report generated",
+		slog.Int("groups", len(linksSlice)),
+		slog.Int("size_bytes", buf.Len()),
+	)
 
 	return &buf, nil
 }

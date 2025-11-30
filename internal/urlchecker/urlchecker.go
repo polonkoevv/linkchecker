@@ -3,6 +3,7 @@ package urlchecker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,6 +35,10 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	// Нормализуем URL
 	normalizedURL, err := c.normalizeURL(rawURL)
 	if err != nil {
+		slog.Warn("failed to normalize URL",
+			slog.String("raw_url", rawURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -46,6 +51,10 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	// Создаем запрос с правильными заголовками
 	req, err := http.NewRequest("HEAD", normalizedURL, nil)
 	if err != nil {
+		slog.Error("failed to create HTTP request",
+			slog.String("url", normalizedURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -61,6 +70,10 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 	// Выполняем запрос
 	resp, err := c.client.Do(req)
 	if err != nil {
+		slog.Debug("HTTP request failed",
+			slog.String("url", normalizedURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -79,6 +92,13 @@ func (c *Checker) CheckURL(rawURL string) models.Link {
 		status = models.LinkStatusAvailable
 	}
 
+	slog.Debug("checked URL",
+		slog.String("url", rawURL),
+		slog.Int("status_code", resp.StatusCode),
+		slog.String("status", string(status)),
+		slog.Duration("duration", duration),
+	)
+
 	return models.Link{
 		URL:       rawURL,
 		Status:    status,
@@ -93,6 +113,10 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 
 	normalizedURL, err := c.normalizeURL(rawURL)
 	if err != nil {
+		slog.Warn("failed to normalize URL",
+			slog.String("raw_url", rawURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -104,6 +128,10 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 
 	req, err := http.NewRequestWithContext(ctx, "HEAD", normalizedURL, nil)
 	if err != nil {
+		slog.Error("failed to create HTTP request with context",
+			slog.String("url", normalizedURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -118,6 +146,10 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		slog.Debug("HTTP request with context failed",
+			slog.String("url", normalizedURL),
+			slog.Any("error", err),
+		)
 		return models.Link{
 			URL:       rawURL,
 			Status:    models.LinkStatusNotAvailable,
@@ -134,6 +166,13 @@ func (c *Checker) CheckURLWithContext(ctx context.Context, rawURL string) models
 	if resp.StatusCode < 400 {
 		status = models.LinkStatusAvailable
 	}
+
+	slog.Debug("checked URL with context",
+		slog.String("url", rawURL),
+		slog.Int("status_code", resp.StatusCode),
+		slog.String("status", string(status)),
+		slog.Duration("duration", duration),
+	)
 
 	return models.Link{
 		URL:       rawURL,
