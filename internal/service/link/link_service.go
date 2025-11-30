@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/polonkoevv/linkchecker/internal/models"
@@ -21,13 +22,22 @@ type LinkService struct {
 	repository   linkRepository
 	urlChecker   *urlchecker.Checker
 	pdfGenerator *pdfgenerator.GoFPDFGenerator
+
+	workerCount int
 }
 
-func New(repo linkRepository, timeout time.Duration, pdfGenerator *pdfgenerator.GoFPDFGenerator) *LinkService {
+const defaultWorkerCount = 4
+
+func New(repo linkRepository, timeout time.Duration, pdfGenerator *pdfgenerator.GoFPDFGenerator, workerCount int) *LinkService {
+	if workerCount <= 0 {
+		workerCount = defaultWorkerCount
+	}
+
 	return &LinkService{
 		repository:   repo,
 		urlChecker:   urlchecker.NewChecker(timeout),
 		pdfGenerator: pdfGenerator,
+		workerCount:  workerCount,
 	}
 }
 
@@ -35,42 +45,101 @@ func (s *LinkService) CheckMany(ctx context.Context, links []string) (models.Lin
 	linksLen := len(links)
 	checkedLinks := make([]models.Link, 0, linksLen)
 
-	slog.Info("checking links", slog.Int("count", linksLen))
+	slog.Info("checking links with worker pool", slog.Int("count", linksLen))
 
-	for _, raw := range links {
+	if linksLen == 0 {
+		return models.LinksResponse{
+			Links:    map[string]models.LinkStatus{},
+			LinksNum: 0,
+		}, nil
+	}
+
+	jobs := make(chan string)
+	results := make(chan models.Link)
+
+	workerCount := s.workerCount
+	if workerCount > linksLen {
+		workerCount = linksLen
+	}
+
+	var wgWorkers sync.WaitGroup
+	wgWorkers.Add(workerCount)
+
+	for i := 0; i < workerCount; i++ {
+		go func(id int) {
+			defer wgWorkers.Done()
+
+			for raw := range jobs {
+				select {
+				case <-ctx.Done():
+					slog.Warn("worker exiting due to context done", slog.Int("worker_id", id))
+					return
+				default:
+				}
+
+				link := s.urlChecker.CheckURLWithContext(ctx, raw)
+
+				select {
+				case <-ctx.Done():
+					slog.Warn("worker canceled while sending result", slog.Int("worker_id", id))
+					return
+				case results <- link:
+				}
+			}
+		}(i)
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, raw := range links {
+			select {
+			case <-ctx.Done():
+				slog.Warn("producer stopped due to context done")
+				return
+			case jobs <- raw:
+			}
+		}
+	}()
+
+	go func() {
+		wgWorkers.Wait()
+		close(results)
+	}()
+
+	for {
 		select {
 		case <-ctx.Done():
 			slog.Warn("check many canceled by context")
 			return models.LinksResponse{}, ctx.Err()
-		default:
+
+		case link, ok := <-results:
+			if !ok {
+				linksNum, err := s.repository.InsertMany(checkedLinks)
+				if err != nil {
+					slog.Error("failed to insert checked links", slog.Any("error", err))
+					return models.LinksResponse{}, err
+				}
+
+				res := models.LinksResponse{
+					Links:    make(map[string]models.LinkStatus, len(checkedLinks)),
+					LinksNum: linksNum,
+				}
+				for _, l := range checkedLinks {
+					res.Links[l.URL] = l.Status
+				}
+
+				slog.Debug("links checked and stored with worker pool",
+					slog.Int("links_num", linksNum),
+					slog.Int("links_count", len(checkedLinks)),
+					slog.Int("workers", workerCount),
+				)
+
+				return res, nil
+			}
+
+			checkedLinks = append(checkedLinks, link)
 		}
-
-		// checkedLinks = append(checkedLinks, s.urlChecker.CheckURLWithContext(ctx, raw))
-		checkedLinks = append(checkedLinks, s.urlChecker.CheckURL(raw))
 	}
-
-	linksNum, err := s.repository.InsertMany(checkedLinks)
-	if err != nil {
-		slog.Error("failed to insert checked links", slog.Any("error", err))
-		return models.LinksResponse{}, err
-	}
-
-	res := models.LinksResponse{
-		Links: make(map[string]models.LinkStatus, len(checkedLinks)),
-	}
-
-	for _, link := range checkedLinks {
-		res.Links[link.URL] = link.Status
-	}
-
-	res.LinksNum = linksNum
-
-	slog.Debug("links checked and stored",
-		slog.Int("links_num", linksNum),
-		slog.Int("links_count", len(checkedLinks)),
-	)
-
-	return res, nil
 }
 
 func (s *LinkService) GenerateReport(ctx context.Context, linksNum []int) (*bytes.Buffer, error) {

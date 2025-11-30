@@ -36,7 +36,7 @@ func main() {
 
 	pdfGen := pdfgenerator.GoFPDFGenerator{}
 
-	srv := link.New(stg, 5*time.Second, &pdfGen)
+	srv := link.New(stg, 5*time.Second, &pdfGen, 4)
 	slog.Info("link service initialized")
 
 	handler := links.New(srv)
