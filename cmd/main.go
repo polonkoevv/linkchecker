@@ -19,7 +19,7 @@ func main() {
 	appLogger, closeLogFile, err := logger.SetupLogger(cfg.Logger.LogPath, cfg.Logger.LevelInfo)
 	if err != nil {
 		slog.Error("error while setting up logger", slog.Any("error", err))
-		os.Exit(1)
+		return
 	}
 	slog.SetDefault(appLogger)
 	defer func() {
@@ -31,7 +31,7 @@ func main() {
 	a, err := app.New(cfg)
 	if err != nil {
 		slog.Error("failed to initialize app", slog.Any("error", err))
-		return // defer выполнится автоматически
+		return
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -39,6 +39,6 @@ func main() {
 
 	if err := a.Run(ctx); err != nil && err != http.ErrServerClosed {
 		slog.Error("app stopped with error", slog.Any("error", err))
-		return // defer выполнится автоматически
+		return
 	}
 }

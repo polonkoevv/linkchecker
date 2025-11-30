@@ -10,3 +10,10 @@ logs/
 PLAN.md
 
 *.json
+
+*.out
+coverage.html
+
+linkchecker
+linkchecker.exe
+dist/

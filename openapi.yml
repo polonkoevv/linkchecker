@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: Link Checker API
+  description: |
+    API для проверки доступности интернет-ресурсов и генерации отчетов.
+    
+    Сервис позволяет:
+    - Проверять доступность ссылок (по одной или несколько)
+    - Получать статусы проверенных ссылок с присвоенным номером группы
+    - Генерировать PDF или JSON отчеты по ранее проверенным группам ссылок
+    - Получать все сохраненные группы ссылок
+    
+    Все POST запросы требуют заголовок `Content-Type: application/json`.
+    Максимальный размер тела запроса: 1 MB.
+  version: 1.0.0
+  contact:
+    name: Link Checker API Support
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://{host}:{port}
+    description: Custom server
+    variables:
+      host:
+        default: localhost
+      port:
+        default: "8080"
+
+tags:
+  - name: links
+    description: Операции с проверкой ссылок
+  - name: reports
+    description: Генерация отчетов
+
+paths:
+  /links:
+    post:
+      tags:
+        - links
+      summary: Проверка ссылок
+      description: |
+        Проверяет доступность указанных интернет-ресурсов и возвращает их статусы.
+        Ссылкам присваивается номер группы для последующего использования.
+        Дубликаты ссылок автоматически удаляются.
+      operationId: checkLinks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckLinksRequest'
+            examples:
+              single_link:
+                summary: Одна ссылка
+                value:
+                  links:
+                    - "https://example.com"
+              multiple_links:
+                summary: Несколько ссылок
+                value:
+                  links:
+                    - "https://example.com"
+                    - "https://google.com"
+                    - "github.com"
+      responses:
+        '200':
+          description: Успешная проверка ссылок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinksResponse'
+              examples:
+                success:
+                  summary: Успешный ответ
+                  value:
+                    links:
+                      "https://example.com": "available"
+                      "https://google.com": "available"
+                      "github.com": "not available"
+                    links_num: 1
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                empty_links:
+                  value: "Links array cannot be empty"
+                invalid_json:
+                  value: "Invalid JSON: ..."
+        '408':
+          description: Превышено время ожидания
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                timeout:
+                  value: "Link check timeout"
+                canceled:
+                  value: "Request canceled"
+        '413':
+          description: Тело запроса слишком большое
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Request body too large"
+        '415':
+          description: Неподдерживаемый тип контента
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Content-Type must be application/json"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+
+    get:
+      tags:
+        - links
+      summary: Получить все группы ссылок
+      description: |
+        Возвращает все сохраненные группы ссылок с их статусами проверки.
+      operationId: getAllLinks
+      responses:
+        '200':
+          description: Список всех групп ссылок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Links'
+              examples:
+                success:
+                  summary: Успешный ответ
+                  value:
+                    - links_num: 1
+                      links:
+                        - url: "https://example.com"
+                          status: "available"
+                          duration: "150ms"
+                          checked_at: "2024-01-15T10:30:00Z"
+                    - links_num: 2
+                      links:
+                        - url: "https://google.com"
+                          status: "available"
+                          duration: "200ms"
+                          checked_at: "2024-01-15T10:31:00Z"
+        '408':
+          description: Превышено время ожидания
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                timeout:
+                  value: "Get all timeout"
+                canceled:
+                  value: "Request canceled"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /report:
+    post:
+      tags:
+        - reports
+      summary: Генерация отчета
+      description: |
+        Генерирует отчет по указанным группам ссылок.
+        
+        Формат ответа зависит от заголовка `Accept`:
+        - `Accept: application/json` - возвращает JSON с метаданными отчета
+        - По умолчанию или `Accept: application/pdf` - возвращает PDF файл
+        
+        Если некоторые группы не найдены, возвращаются только найденные группы.
+        Если все группы отсутствуют, возвращается ошибка.
+      operationId: generateReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateReportRequest'
+            examples:
+              single_group:
+                summary: Одна группа
+                value:
+                  links_num: [1]
+              multiple_groups:
+                summary: Несколько групп
+                value:
+                  links_num: [1, 2, 3]
+      responses:
+        '200':
+          description: Успешная генерация отчета
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: "attachment; filename=link_report.pdf"
+            Content-Length:
+              schema:
+                type: string
+                example: "12345"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateReportResponse'
+              examples:
+                json_response:
+                  summary: JSON метаданные
+                  value:
+                    message: "PDF report generated successfully"
+                    size_bytes: 12345
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                empty_links_num:
+                  value: "Links_num array cannot be empty"
+                invalid_json:
+                  value: "Invalid JSON: ..."
+        '408':
+          description: Превышено время ожидания
+          content:
+            text/plain:
+              schema:
+                type: string
+        '413':
+          description: Тело запроса слишком большое
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Request body too large"
+        '415':
+          description: Неподдерживаемый тип контента
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Content-Type must be application/json"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                generation_failed:
+                  value: "Failed to generate report: ..."
+
+components:
+  schemas:
+    CheckLinksRequest:
+      type: object
+      required:
+        - links
+      properties:
+        links:
+          type: array
+          items:
+            type: string
+            format: uri
+            description: URL ссылки для проверки. Протокол (http:// или https://) можно опустить.
+          minItems: 1
+          description: Массив ссылок для проверки. Дубликаты автоматически удаляются.
+      example:
+        links:
+          - "https://example.com"
+          - "google.com"
+          - "https://github.com"
+
+    LinksResponse:
+      type: object
+      required:
+        - links
+        - links_num
+      properties:
+        links:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkStatus'
+          description: Карта ссылок и их статусов
+        links_num:
+          type: integer
+          minimum: 1
+          description: Номер присвоенной группы ссылок
+      example:
+        links:
+          "https://example.com": "available"
+          "google.com": "not available"
+        links_num: 1
+
+    Links:
+      type: object
+      required:
+        - links
+        - links_num
+      properties:
+        links_num:
+          type: integer
+          minimum: 1
+          description: Номер группы ссылок
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Массив ссылок в группе
+
+    Link:
+      type: object
+      required:
+        - url
+        - status
+        - duration
+        - checked_at
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL ссылки
+        status:
+          $ref: '#/components/schemas/LinkStatus'
+        duration:
+          type: string
+          format: duration
+          description: Время проверки ссылки в формате Go duration (например, "150ms", "2.5s")
+        checked_at:
+          type: string
+          format: date-time
+          description: Время проверки ссылки в формате RFC3339
+      example:
+        url: "https://example.com"
+        status: "available"
+        duration: "150ms"
+        checked_at: "2024-01-15T10:30:00Z"
+
+    LinkStatus:
+      type: string
+      enum:
+        - available
+        - not available
+      description: Статус доступности ссылки
+      example: "available"
+
+    GenerateReportRequest:
+      type: object
+      required:
+        - links_num
+      properties:
+        links_num:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          minItems: 1
+          description: Массив номеров групп ссылок для включения в отчет
+      example:
+        links_num: [1, 2, 3]
+
+    GenerateReportResponse:
+      type: object
+      required:
+        - message
+        - size_bytes
+      properties:
+        message:
+          type: string
+          description: Сообщение о результате генерации
+          example: "PDF report generated successfully"
+        size_bytes:
+          type: integer
+          minimum: 0
+          description: Размер сгенерированного PDF файла в байтах
+          example: 12345
+
+  securitySchemes: {}
+
